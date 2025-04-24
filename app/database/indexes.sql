@@ -1,0 +1,20 @@
+-- Indexes for Performance
+CREATE INDEX idx_users_library_id ON users(library_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_books_library_id ON books(library_id);
+CREATE INDEX idx_books_isbn ON books(isbn);
+CREATE INDEX idx_borrow_transactions_user_id ON borrow_transactions(user_id);
+CREATE INDEX idx_borrow_transactions_book_id ON borrow_transactions(book_id);
+CREATE INDEX idx_reservations_user_id ON reservations(user_id);
+CREATE INDEX idx_reservations_book_id ON reservations(book_id);
+CREATE INDEX idx_wishlists_user_id ON wishlists(user_id);
+CREATE INDEX idx_wishlists_book_id ON wishlists(book_id);
+CREATE INDEX idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX idx_reviews_book_id ON reviews(book_id);
+CREATE INDEX idx_tickets_user_id ON tickets(user_id);
+CREATE INDEX idx_tickets_resolved_by ON tickets(resolved_by);
+CREATE INDEX idx_fines_user_id ON fines(user_id);
+CREATE INDEX idx_fines_borrow_id ON fines(borrow_id);
+CREATE INDEX idx_document_uploads_user_id ON document_uploads(user_id);
+CREATE INDEX idx_document_uploads_book_id ON document_uploads(book_id);
+CREATE INDEX idx_document_uploads_library_id ON document_uploads(library_id);
