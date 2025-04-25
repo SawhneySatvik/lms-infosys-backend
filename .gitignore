@@ -7,3 +7,5 @@ venv
 venv/
 .venv/*
 venv/*
+
+ProjectDescription.md
