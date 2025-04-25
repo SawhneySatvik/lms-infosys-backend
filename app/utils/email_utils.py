@@ -1,42 +1,31 @@
 import smtplib
 from email.message import EmailMessage
-from dotenv import load_dotenv
-import os
-import secrets
 from flask import current_app
-
-load_dotenv()
+from . import logger
 
 def generate_otp(length=6):
-    """Generate a secure 6-digit OTP."""
-    return ''.join(secrets.choice('0123456789') for _ in range(length))
+    import random
+    return ''.join([str(random.randint(0, 9)) for _ in range(length)])
 
-def send_otp_email(receiver_email, otp):
-    """Send OTP email using Gmail SMTP."""
-    sender_email = os.getenv('EMAIL_ID')
-    sender_password = os.getenv('EMAIL_APP_PASSWORD')
-
-    subject = "Your LMS OTP Verification Code"
-    body = (
-        '<div style="font-family: Arial, sans-serif; text-align: center;">'
-        '<h2>Your OTP Code</h2>'
-        f'<p>Your OTP code is <strong>{otp}</strong>. It expires in 5 minutes.</p>'
-        '<p>© 2025 Library Management System</p>'
-        '</div>'
-    )
-
-    msg = EmailMessage()
-    msg.set_content(body, subtype='html')
-    msg['Subject'] = subject
-    msg['From'] = sender_email
-    msg['To'] = receiver_email
-
+def send_otp_email(email, otp):
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(sender_email, sender_password)
+        msg = EmailMessage()
+        msg.set_content(f"Your OTP is: {otp}. It is valid for 5 minutes.")
+        msg['Subject'] = 'Library Management System OTP'
+        msg['From'] = current_app.config['MAIL_DEFAULT_SENDER']
+        msg['To'] = email
+
+        with smtplib.SMTP_SSL(
+            current_app.config['MAIL_SERVER'],
+            current_app.config['MAIL_PORT']
+        ) as server:
+            server.login(
+                current_app.config['MAIL_USERNAME'],
+                current_app.config['MAIL_PASSWORD']
+            )
             server.send_message(msg)
-        current_app.logger.info(f"OTP sent to {receiver_email}")
+        logger.debug(f"OTP email sent to {email}: OTP={otp}")
         return True
     except Exception as e:
-        current_app.logger.error(f"Error sending OTP email to {receiver_email}: {str(e)}")
+        logger.error(f"Error sending OTP email to {email}: {str(e)}")
         return False
