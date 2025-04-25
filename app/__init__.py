@@ -2,16 +2,16 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from .config import Config
 
-from .models import *
-
 db = SQLAlchemy()
+
+from .models import *
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
     db.init_app(app)
-
+    
     @app.route('/test-db')
     def test_db():
         try:
@@ -19,5 +19,15 @@ def create_app():
             return {"message": "Database connected", "data": [dict(row._mapping) for row in result]}, 200
         except Exception as e:
             return {"error": str(e)}, 500
+    
+    from .blueprints.auth import auth_bp
+    from .blueprints.books import books_bp
+    from .blueprints.authors import authors_bp
+    from .blueprints.genres import genres_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(books_bp)
+    app.register_blueprint(authors_bp)
+    app.register_blueprint(genres_bp)
 
     return app
