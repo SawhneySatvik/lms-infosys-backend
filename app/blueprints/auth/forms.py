@@ -15,7 +15,7 @@ class SignupForm(FlaskForm):
     ])
     name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
     library_id = StringField('Library ID', validators=[DataRequired()])
-    user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
+    user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg','png'])])
     submit = SubmitField('Sign Up')
 
     def validate_library_id(self, library_id):
@@ -35,7 +35,6 @@ class LoginForm(FlaskForm):
 class OTPForm(FlaskForm):
     user_id = StringField('User ID', validators=[DataRequired()])
     otp = StringField('OTP', validators=[DataRequired(), Length(min=6, max=6, message='OTP must be 6 characters')])
-    flow = StringField('Flow', validators=[Optional(), Regexp(r'^(signup|signin)$', message='Flow must be "signup" or "signin"')])
     submit = SubmitField('Verify OTP')
 
     def validate_user_id(self, user_id):
@@ -82,3 +81,18 @@ class AdminRegisterForm(FlaskForm):
     def validate_library_name(self, library_name):
         if Library.query.filter_by(name=library_name.data).first():
             raise ValidationError('Library name already exists.')
+
+class LibrarianRegisterForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8, message='Password must be at least 8 characters'),
+        Regexp(r'^(?=.*[A-Z])(?=.*\d)', message='Password must contain at least one uppercase letter and one number')
+    ])
+    name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
+    user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
+    submit = SubmitField('Register Librarian')
+
+    def validate_email(self, email):
+        if User.query.filter_by(email=email.data).first():
+            raise ValidationError('Email already registered.')
