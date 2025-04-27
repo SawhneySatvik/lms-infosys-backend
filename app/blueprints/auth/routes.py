@@ -1,13 +1,15 @@
 from flask import request, jsonify, current_app
 from . import auth_bp
-from .forms import SignupForm, LoginForm, ProfileForm, ResetPasswordForm, RefreshTokenForm, AdminRegisterForm, LibrarianRegisterForm
+from .forms import SignupForm, LoginForm, ProfileForm, ResetPasswordForm, RefreshTokenForm, AdminRegisterForm, LibrarianRegisterForm, OTPForm
 from ... import db
 from ...models.users import User
 from ...models.libraries import Library
+from ...models.otp_verifications import OTPVerification
 from ...config import Config
 from supabase import create_client, Client
 from ...utils.role_manager import role_required
-from datetime import datetime
+from ...utils.email_utils import generate_otp, send_otp_email
+from datetime import datetime, timedelta, timezone  # Added timezone import
 
 # Initialize Supabase client
 supabase: Client = create_client(Config.SUPABASE_PROJECT_URL, Config.SUPABASE_ANON_PUBLIC_KEY)
@@ -29,7 +31,7 @@ def admin_register():
         if 'user_image' in request.files:
             file = request.files['user_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
                 supabase.storage.from_('user_images').upload(
                     path=filename,
                     file=file.stream,
@@ -55,8 +57,8 @@ def admin_register():
                 state=form.state.data,
                 country=form.country.data,
                 pincode=form.pincode.data,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),  # Updated
+                updated_at=datetime.now(timezone.utc)   # Updated
             )
             db.session.add(new_library)
             db.session.flush()  # Generate library_id
@@ -72,8 +74,8 @@ def admin_register():
                 role='Admin',
                 is_active=True,
                 user_image=user_image_url,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),  # Updated
+                updated_at=datetime.now(timezone.utc)   # Updated
             )
             db.session.add(new_user)
             db.session.flush()  # Persist user to users table
@@ -120,7 +122,7 @@ def librarian_register():
         if 'user_image' in request.files:
             file = request.files['user_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.now().timestamp()}_{file.filename}"
+                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
                 supabase.storage.from_('user_images').upload(
                     path=filename,
                     file=file.stream,
@@ -146,8 +148,8 @@ def librarian_register():
                 role='Librarian',
                 is_active=True,
                 user_image=user_image_url,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),  # Updated
+                updated_at=datetime.now(timezone.utc)   # Updated
             )
             db.session.add(new_user)
             db.session.commit()
@@ -186,7 +188,7 @@ def signup():
         if 'user_image' in request.files:
             file = request.files['user_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
                 supabase.storage.from_('user_images').upload(
                     path=filename,
                     file=file.stream,
@@ -196,7 +198,8 @@ def signup():
 
         auth_response = supabase.auth.sign_up({
             "email": form.email.data,
-            "password": form.password.data
+            "password": form.password.data,
+            "options": {"data": {"role": "Member"}}
         })
         user_id = auth_response.user.id
 
@@ -207,13 +210,43 @@ def signup():
                 name=form.name.data,
                 email=form.email.data,
                 role='Member',
-                is_active=True,
+                is_active=False,  # Require OTP verification
                 user_image=user_image_url,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),  # Updated
+                updated_at=datetime.now(timezone.utc)   # Updated
             )
             db.session.add(new_user)
+            db.session.flush()
+
+            # Generate and store OTP
+            otp = generate_otp(6)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)  # Updated
+            otp_verification = OTPVerification(
+                user_id=user_id,
+                email=form.email.data,
+                otp=otp,
+                expires_at=expires_at,
+                created_at=datetime.now(timezone.utc)  # Updated
+            )
+            db.session.add(otp_verification)
             db.session.commit()
+
+            # Send OTP email
+            if not send_otp_email(form.email.data, otp):
+                try:
+                    supabase_admin.auth.admin.delete_user(user_id)
+                    db.session.delete(new_user)
+                    db.session.delete(otp_verification)
+                    db.session.commit()
+                except:
+                    db.session.rollback()
+                return jsonify({"error": "Failed to send OTP email"}), 500
+
+            return jsonify({
+                "message": "User registered successfully. Please verify OTP sent to your email.",
+                "user_id": str(user_id)
+            }), 201
+
         except Exception as e:
             try:
                 supabase_admin.auth.admin.delete_user(user_id)
@@ -221,11 +254,6 @@ def signup():
                 pass
             db.session.rollback()
             return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
-
-        return jsonify({
-            "message": "User registered successfully. You can now sign in.",
-            "user_id": str(user_id)
-        }), 201
 
     except Exception as e:
         db.session.rollback()
@@ -248,24 +276,127 @@ def signin():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        access_token = response.session.access_token
-        refresh_token = response.session.refresh_token
+        if user.role == 'Member':
+            if not user.is_active:
+                return jsonify({"error": "Account not activated. Please verify OTP from signup."}), 403
 
-        return jsonify({
-            "message": "Signed in successfully",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "user": {
-                "user_id": str(user.user_id),
-                "name": user.name,
-                "email": user.email,
-                "role": user.role,
-                "user_image": user.user_image
-            }
-        }), 200
+            # Generate and store OTP with session tokens
+            otp = generate_otp(6)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+            otp_verification = OTPVerification(
+                user_id=user_id,
+                email=user.email,
+                otp=otp,
+                access_token=response.session.access_token,  # Store tokens
+                refresh_token=response.session.refresh_token,  # Store tokens
+                expires_at=expires_at,
+                created_at=datetime.now(timezone.utc)
+            )
+            db.session.add(otp_verification)
+            db.session.commit()
+
+            # Send OTP email
+            if not send_otp_email(user.email, otp):
+                db.session.delete(otp_verification)
+                db.session.commit()
+                return jsonify({"error": "Failed to send OTP email"}), 500
+
+            return jsonify({
+                "message": "Please verify OTP sent to your email to complete login.",
+                "user_id": str(user_id)
+            }), 200
+        else:
+            # Non-Member (Admin, Librarian) login without 2FA
+            access_token = response.session.access_token
+            refresh_token = response.session.refresh_token
+
+            return jsonify({
+                "message": "Signed in successfully",
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user": {
+                    "user_id": str(user.user_id),
+                    "name": user.name,
+                    "email": user.email,
+                    "role": user.role,
+                    "user_image": user.user_image
+                }
+            }), 200
 
     except Exception as e:
         return jsonify({"error": "Invalid credentials or server error"}), 401
+
+@auth_bp.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    form = OTPForm()
+    if not form.validate_on_submit():
+        return jsonify({"error": form.errors}), 400
+
+    try:
+        # Clean up expired OTPs
+        OTPVerification.query.filter(OTPVerification.expires_at < datetime.now(timezone.utc)).delete()
+        db.session.commit()
+
+        # Validate OTP
+        otp_verification = OTPVerification.query.filter_by(
+            user_id=form.user_id.data,
+            otp=form.otp.data
+        ).first()
+
+        if not otp_verification:
+            return jsonify({"error": "Invalid or expired OTP"}), 400
+
+        if otp_verification.expires_at < datetime.now(timezone.utc):
+            db.session.delete(otp_verification)
+            db.session.commit()
+            return jsonify({"error": "OTP has expired"}), 400
+
+        user = User.query.filter_by(user_id=form.user_id.data).first()
+        if not user:
+            db.session.delete(otp_verification)
+            db.session.commit()
+            return jsonify({"error": "User not found"}), 404
+
+        # For signup: Activate account
+        if not user.is_active and user.role == 'Member':
+            user.is_active = True
+            db.session.delete(otp_verification)
+            db.session.commit()
+            return jsonify({
+                "message": "OTP verified successfully. Account activated. You can now sign in."
+            }), 200
+
+        # For login: Return stored tokens
+        if user.role == 'Member':
+            access_token = otp_verification.access_token
+            refresh_token = otp_verification.refresh_token
+
+            if not access_token or not refresh_token:
+                db.session.delete(otp_verification)
+                db.session.commit()
+                return jsonify({"error": "Session tokens not found. Please sign in again."}), 400
+
+            db.session.delete(otp_verification)
+            db.session.commit()
+
+            return jsonify({
+                "message": "OTP verified successfully. Signed in successfully.",
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user": {
+                    "user_id": str(user.user_id),
+                    "name": user.name,
+                    "email": user.email,
+                    "role": user.role,
+                    "user_image": user.user_image
+                }
+            }), 200
+
+        return jsonify({"error": "OTP verification not required for this user"}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"OTP verification failed: {str(e)}"}), 500
 
 @auth_bp.route('/refresh', methods=['POST'])
 def refresh():
@@ -334,7 +465,7 @@ def profile():
             if 'user_image' in request.files:
                 file = request.files['user_image']
                 if file and allowed_file(file.filename):
-                    filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                    filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
                     supabase.storage.from_('user_images').upload(
                         path=filename,
                         file=file.stream,
@@ -346,7 +477,7 @@ def profile():
                 user.name = form.name.data
             if user_image_url and user_image_url != user.user_image:
                 user.user_image = user_image_url
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(timezone.utc)  # Updated
             db.session.commit()
 
             if form.email.data and form.email.data != user.email:
@@ -380,7 +511,3 @@ def reset_password():
         return jsonify({"message": "Password reset email sent"}), 200
     except Exception as e:
         return jsonify({"error": f"Password reset failed: {str(e)}"}), 400
-    
-@auth_bp.route('/verify-otp', methods=['POST'])
-def otp_verification():
-    return 1234

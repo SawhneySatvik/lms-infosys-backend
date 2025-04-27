@@ -4,7 +4,9 @@ from wtforms import StringField, PasswordField, SubmitField, IntegerField
 from wtforms.validators import DataRequired, Email, Length, Regexp, ValidationError, Optional
 from ...models.users import User
 from ...models.libraries import Library
+from ...models.otp_verifications import OTPVerification
 import uuid
+from datetime import datetime, timedelta, timezone  # Added timezone import
 
 class SignupForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -15,7 +17,7 @@ class SignupForm(FlaskForm):
     ])
     name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
     library_id = StringField('Library ID', validators=[DataRequired()])
-    user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg','png'])])
+    user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'])])
     submit = SubmitField('Sign Up')
 
     def validate_library_id(self, library_id):
@@ -42,6 +44,22 @@ class OTPForm(FlaskForm):
             uuid_obj = uuid.UUID(user_id.data)
         except ValueError:
             raise ValidationError('Invalid user_id format. Must be a valid UUID.')
+        user = User.query.filter_by(user_id=user_id.data).first()
+        if not user:
+            raise ValidationError('User not found.')
+
+    def validate_otp(self, otp):
+        user = User.query.filter_by(user_id=self.user_id.data).first()
+        if not user:
+            return
+
+        # Check attempt count
+        recent_attempts = OTPVerification.query.filter(
+            OTPVerification.user_id == self.user_id.data,
+            OTPVerification.created_at >= datetime.now(timezone.utc) - timedelta(minutes=15)  # Updated
+        ).count()
+        if recent_attempts >= 3:
+            raise ValidationError('Too many failed OTP attempts. Please try again after 15 minutes.')
 
 class ProfileForm(FlaskForm):
     name = StringField('Name', validators=[Length(min=2, max=100)])
