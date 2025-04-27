@@ -3,6 +3,7 @@ from . import authors_bp
 from .forms import AuthorForm
 from ... import db
 from ...models.authors import Author
+from ...models.books import Book
 from ...models.libraries import Library
 from ...utils.role_manager import role_required
 from ...config import Config
