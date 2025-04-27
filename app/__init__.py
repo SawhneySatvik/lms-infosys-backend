@@ -11,6 +11,10 @@ def create_app():
     app.config.from_object(Config)
 
     db.init_app(app)
+
+    @app.route('/health')
+    def health():
+        return {"message":"I am healthy!"}
     
     @app.route('/test-db')
     def test_db():
