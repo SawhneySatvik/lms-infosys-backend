@@ -380,3 +380,7 @@ def reset_password():
         return jsonify({"message": "Password reset email sent"}), 200
     except Exception as e:
         return jsonify({"error": f"Password reset failed: {str(e)}"}), 400
+    
+@auth_bp.route('/verify-otp', methods=['POST'])
+def otp_verification():
+    return 1234
