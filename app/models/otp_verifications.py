@@ -1,5 +1,5 @@
 from .. import db
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 class OTPVerification(db.Model):
