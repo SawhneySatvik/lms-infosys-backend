@@ -10,7 +10,6 @@ from ...config import Config
 from supabase import create_client, Client
 from datetime import datetime
 
-# Initialize Supabase client
 supabase: Client = create_client(Config.SUPABASE_PROJECT_URL, Config.SUPABASE_ANON_PUBLIC_KEY)
 
 def allowed_file(filename):
@@ -30,12 +29,12 @@ def create_author():
         if not library:
             return jsonify({"error": "Librarian's library not found"}), 404
 
-        # Upload author_image if provided
+        # Handle author_image upload
         author_image_url = None
         if 'author_image' in request.files:
             file = request.files['author_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"author_{datetime.utcnow().timestamp()}_{file.filename}"
                 supabase.storage.from_('author_images').upload(
                     path=filename,
                     file=file.stream,
@@ -43,7 +42,6 @@ def create_author():
                 )
                 author_image_url = supabase.storage.from_('author_images').get_public_url(filename)
 
-        # Create author
         new_author = Author(
             name=form.name.data,
             bio=form.bio.data,
@@ -53,11 +51,7 @@ def create_author():
         )
         db.session.add(new_author)
         db.session.commit()
-
-        return jsonify({
-            "message": "Author created successfully",
-            "author_id": str(new_author.author_id)
-        }), 201
+        return jsonify({"message": "Author created successfully", "author_id": str(new_author.author_id)}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -71,7 +65,6 @@ def list_authors():
         per_page = request.args.get('per_page', 10, type=int)
         query = Author.query
 
-        # Optional filter
         name = request.args.get('name')
         if name:
             query = query.filter(Author.name.ilike(f'%{name}%'))
@@ -83,7 +76,7 @@ def list_authors():
                 "name": author.name,
                 "bio": author.bio,
                 "author_image": author.author_image,
-                "book_ids": [str(bid) for bid in author.book_ids or []],
+                "book_ids": [str(bid) for bid in (author.book_ids or [])],
                 "created_at": author.created_at.isoformat(),
                 "updated_at": author.updated_at.isoformat()
             } for author in authors.items],
@@ -109,7 +102,7 @@ def get_author(author_id):
                 "name": author.name,
                 "bio": author.bio,
                 "author_image": author.author_image,
-                "book_ids": [str(bid) for bid in author.book_ids or []],
+                "book_ids": [str(bid) for bid in (author.book_ids or [])],
                 "created_at": author.created_at.isoformat(),
                 "updated_at": author.updated_at.isoformat()
             }
@@ -135,12 +128,12 @@ def update_author(author_id):
         if not author:
             return jsonify({"error": "Author not found"}), 404
 
-        # Upload new author_image if provided
+        # Handle author_image upload
         author_image_url = author.author_image
         if 'author_image' in request.files:
             file = request.files['author_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"author_{datetime.utcnow().timestamp()}_{file.filename}"
                 supabase.storage.from_('author_images').upload(
                     path=filename,
                     file=file.stream,
@@ -148,20 +141,13 @@ def update_author(author_id):
                 )
                 author_image_url = supabase.storage.from_('author_images').get_public_url(filename)
 
-        # Update author fields
-        if form.name.data:
-            author.name = form.name.data
-        if form.bio.data is not None:
-            author.bio = form.bio.data
+        author.name = form.name.data or author.name
+        author.bio = form.bio.data if form.bio.data is not None else author.bio
         author.author_image = author_image_url
         author.updated_at = datetime.utcnow()
 
         db.session.commit()
-
-        return jsonify({
-            "message": "Author updated successfully",
-            "author_id": str(author.author_id)
-        }), 200
+        return jsonify({"message": "Author updated successfully", "author_id": str(author.author_id)}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -175,16 +161,15 @@ def delete_author(author_id):
         if not author:
             return jsonify({"error": "Author not found"}), 404
 
-        # Remove author_id from books
+        # Update books by removing author_id
         books = Book.query.filter(Book.author_ids.contains([author.author_id])).all()
         for book in books:
-            book.author_ids = [aid for aid in book.author_ids if aid != author.author_id]
+            book.author_ids = [aid for aid in (book.author_ids or []) if aid != author.author_id]
             book.updated_at = datetime.utcnow()
             db.session.add(book)
 
         db.session.delete(author)
         db.session.commit()
-
         return jsonify({"message": "Author deleted successfully"}), 200
 
     except Exception as e:
