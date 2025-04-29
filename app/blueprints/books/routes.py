@@ -104,7 +104,7 @@ def list_books():
     try:
         user = request.current_user
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
         query = Book.query.filter_by(library_id=user.library_id)
 
         # Optional filters
