@@ -12,6 +12,10 @@ def create_app():
 
     db.init_app(app)
 
+    @app.route('/')
+    def index():
+        return {"message":"Hello!"}
+
     @app.route('/health')
     def health():
         return {"message":"I am healthy!"}
