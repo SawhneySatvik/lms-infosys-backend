@@ -21,24 +21,18 @@ def create_genre():
         if not library:
             return jsonify({"error": "Librarian's library not found"}), 404
 
-        # Check for existing genre
         if Genre.query.filter_by(name=form.name.data).first():
             return jsonify({"error": "Genre name already exists"}), 400
 
-        # Create genre
         new_genre = Genre(
             name=form.name.data,
             description=form.description.data,
-            created_at=datetime.now(),
-            updated_at=datetime.now()
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         db.session.add(new_genre)
         db.session.commit()
-
-        return jsonify({
-            "message": "Genre created successfully",
-            "genre_id": str(new_genre.genre_id)
-        }), 201
+        return jsonify({"message": "Genre created successfully", "genre_id": str(new_genre.genre_id)}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -52,7 +46,6 @@ def list_genres():
         per_page = request.args.get('per_page', 10, type=int)
         query = Genre.query
 
-        # Optional filter
         name = request.args.get('name')
         if name:
             query = query.filter(Genre.name.ilike(f'%{name}%'))
@@ -112,23 +105,15 @@ def update_genre(genre_id):
         if not genre:
             return jsonify({"error": "Genre not found"}), 404
 
-        # Check for duplicate name
         if form.name.data != genre.name and Genre.query.filter_by(name=form.name.data).first():
             return jsonify({"error": "Genre name already exists"}), 400
 
-        # Update genre fields
-        if form.name.data:
-            genre.name = form.name.data
-        if form.description.data is not None:
-            genre.description = form.description.data
-        genre.updated_at = datetime.now()
+        genre.name = form.name.data or genre.name
+        genre.description = form.description.data if form.description.data is not None else genre.description
+        genre.updated_at = datetime.utcnow()
 
         db.session.commit()
-
-        return jsonify({
-            "message": "Genre updated successfully",
-            "genre_id": str(genre.genre_id)
-        }), 200
+        return jsonify({"message": "Genre updated successfully", "genre_id": str(genre.genre_id)}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -142,16 +127,15 @@ def delete_genre(genre_id):
         if not genre:
             return jsonify({"error": "Genre not found"}), 404
 
-        # Remove genre_id from books
+        # Update books by removing genre_id
         books = Book.query.filter(Book.genre_ids.contains([genre.genre_id])).all()
         for book in books:
-            book.genre_ids = [gid for gid in book.genre_ids if gid != genre.genre_id]
-            book.updated_at = datetime.now()
+            book.genre_ids = [gid for gid in (book.genre_ids or []) if gid != genre.genre_id]
+            book.updated_at = datetime.utcnow()
             db.session.add(book)
 
         db.session.delete(genre)
         db.session.commit()
-
         return jsonify({"message": "Genre deleted successfully"}), 200
 
     except Exception as e:
