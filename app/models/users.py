@@ -12,6 +12,7 @@ class User(db.Model):
     role = db.Column(db.Text, nullable=False, server_default='Member')
     is_active = db.Column(db.Boolean, default=False)  # Changed default to match registration flow
     user_image = db.Column(db.Text)
+    preferred_genre_ids = db.Column(ARRAY(UUID(as_uuid=True)), default=list)
     borrowed_book_ids = db.Column(ARRAY(UUID(as_uuid=True)), default=list)
     reserved_book_ids = db.Column(ARRAY(UUID(as_uuid=True)), default=list)
     wishlist_book_ids = db.Column(ARRAY(UUID(as_uuid=True)), default=list)
