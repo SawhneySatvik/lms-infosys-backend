@@ -104,11 +104,6 @@ class AdminRegisterForm(FlaskForm):
 
 class LibrarianRegisterForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[
-        DataRequired(),
-        Length(min=8, message='Password must be at least 8 characters'),
-        Regexp(r'^(?=.*[A-Z])(?=.*\d)', message='Password must contain at least one uppercase letter and one number')
-    ])
     name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
     user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
     submit = SubmitField('Register Librarian')

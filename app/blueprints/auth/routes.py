@@ -10,6 +10,7 @@ from supabase import create_client, Client
 from ...utils.role_manager import role_required
 from ...utils.email_utils import generate_otp, send_otp_email
 from datetime import datetime, timedelta, timezone  # Added timezone import
+from ...utils import generate_random_password
 
 # Initialize Supabase client
 supabase: Client = create_client(Config.SUPABASE_PROJECT_URL, Config.SUPABASE_ANON_PUBLIC_KEY)
@@ -122,7 +123,7 @@ def librarian_register():
         if 'user_image' in request.files:
             file = request.files['user_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
+                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"
                 supabase.storage.from_('user_images').upload(
                     path=filename,
                     file=file.stream,
@@ -130,10 +131,13 @@ def librarian_register():
                 )
                 user_image_url = supabase.storage.from_('user_images').get_public_url(filename)
 
+        # Generate random password
+        generated_password = generate_random_password()
+
         # Create user in auth.users
         auth_response = supabase.auth.sign_up({
             "email": form.email.data,
-            "password": form.password.data,
+            "password": generated_password,
             "options": {"data": {"role": "Librarian"}}
         })
         user_id = auth_response.user.id
@@ -148,8 +152,8 @@ def librarian_register():
                 role='Librarian',
                 is_active=True,
                 user_image=user_image_url,
-                created_at=datetime.now(timezone.utc),  # Updated
-                updated_at=datetime.now(timezone.utc)   # Updated
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             db.session.add(new_user)
             db.session.commit()
@@ -161,8 +165,28 @@ def librarian_register():
             db.session.rollback()
             return jsonify({"error": f"Failed to create librarian: {str(e)}"}), 500
 
+        # Send email with temporary password
+        email_subject = "Your Librarian Account Credentials"
+        email_body = (
+            f"Dear {form.name.data},\n\n"
+            f"Your librarian account has been created.\n"
+            f"Email: {form.email.data}\n"
+            f"Temporary Password: {generated_password}\n\n"
+            f"Please log in using these credentials and reset your password immediately using the 'Reset Password' option.\n"
+            f"If you have any issues, contact your library administrator.\n\n"
+            f"Best regards,\nLibrary Management System"
+        )
+        if not send_otp_email(form.email.data, email_body, subject=email_subject):
+            try:
+                supabase_admin.auth.admin.delete_user(user_id)
+                db.session.delete(new_user)
+                db.session.commit()
+            except:
+                db.session.rollback()
+            return jsonify({"error": "Failed to send credentials email"}), 500
+
         return jsonify({
-            "message": "Librarian registered successfully. They can now sign in.",
+            "message": "Librarian registered successfully. Credentials have been sent to their email.",
             "user_id": str(user_id)
         }), 201
 
