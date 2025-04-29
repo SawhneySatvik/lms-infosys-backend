@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, PasswordField, SubmitField, IntegerField
-from wtforms.validators import DataRequired, Email, Length, Regexp, ValidationError, Optional
+from wtforms import StringField, PasswordField, SubmitField, IntegerField, FieldList
+from wtforms.validators import DataRequired, Email, Length, Regexp, ValidationError, Optional, UUID
 from ...models.users import User
 from ...models.libraries import Library
 from ...models.otp_verifications import OTPVerification
@@ -18,6 +18,7 @@ class SignupForm(FlaskForm):
     name = StringField('Name', validators=[DataRequired(), Length(min=2, max=100)])
     library_id = StringField('Library ID', validators=[DataRequired()])
     user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'])])
+    preferred_genre_ids = FieldList(StringField(validators=[UUID()]), min_entries=0, description='List of preferred genre UUIDs')
     submit = SubmitField('Sign Up')
 
     def validate_library_id(self, library_id):
@@ -65,6 +66,7 @@ class ProfileForm(FlaskForm):
     name = StringField('Name', validators=[Length(min=2, max=100)])
     email = StringField('Email', validators=[Email()])
     user_image = FileField('User Image', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
+    preferred_genre_ids = FieldList(StringField(validators=[UUID()]), min_entries=0, description='List of preferred genre UUIDs')
     submit = SubmitField('Update Profile')
 
 class ResetPasswordForm(FlaskForm):

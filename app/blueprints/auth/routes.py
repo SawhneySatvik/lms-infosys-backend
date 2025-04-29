@@ -188,7 +188,7 @@ def signup():
         if 'user_image' in request.files:
             file = request.files['user_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
+                filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"
                 supabase.storage.from_('user_images').upload(
                     path=filename,
                     file=file.stream,
@@ -204,6 +204,17 @@ def signup():
         user_id = auth_response.user.id
 
         try:
+            # Validate preferred_genre_ids if provided
+            if form.preferred_genre_ids.data:
+                from ...models.genres import Genre
+                provided_genre_ids = form.preferred_genre_ids.data  # List of UUID strings
+                existing_count = db.session.query(db.func.count(Genre.genre_id)).filter(
+                    Genre.genre_id.in_(provided_genre_ids)
+                ).scalar()
+                if existing_count != len(provided_genre_ids):
+                    return jsonify({"error": "One or more genre IDs are invalid"}), 400
+
+            # Create new user with preferred_genre_ids
             new_user = User(
                 user_id=user_id,
                 library_id=form.library_id.data,
@@ -212,21 +223,22 @@ def signup():
                 role='Member',
                 is_active=False,  # Require OTP verification
                 user_image=user_image_url,
-                created_at=datetime.now(timezone.utc),  # Updated
-                updated_at=datetime.now(timezone.utc)   # Updated
+                preferred_genre_ids=form.preferred_genre_ids.data,  # Assign list of UUID strings
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             db.session.add(new_user)
             db.session.flush()
 
             # Generate and store OTP
             otp = generate_otp(6)
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)  # Updated
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
             otp_verification = OTPVerification(
                 user_id=user_id,
                 email=form.email.data,
                 otp=otp,
                 expires_at=expires_at,
-                created_at=datetime.now(timezone.utc)  # Updated
+                created_at=datetime.now(timezone.utc)
             )
             db.session.add(otp_verification)
             db.session.commit()
@@ -451,7 +463,8 @@ def profile():
                 "email": user.email,
                 "role": user.role,
                 "library_id": str(user.library_id),
-                "user_image": user.user_image
+                "user_image": user.user_image,
+                "preferred_genre_ids": [str(gid) for gid in user.preferred_genre_ids] if user.preferred_genre_ids else []
             }
         }), 200
 
@@ -465,7 +478,7 @@ def profile():
             if 'user_image' in request.files:
                 file = request.files['user_image']
                 if file and allowed_file(file.filename):
-                    filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"  # Updated
+                    filename = f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"
                     supabase.storage.from_('user_images').upload(
                         path=filename,
                         file=file.stream,
@@ -477,7 +490,16 @@ def profile():
                 user.name = form.name.data
             if user_image_url and user_image_url != user.user_image:
                 user.user_image = user_image_url
-            user.updated_at = datetime.now(timezone.utc)  # Updated
+            if form.preferred_genre_ids.data:
+                from ...models.genres import Genre
+                provided_genre_ids = form.preferred_genre_ids.data
+                existing_count = db.session.query(db.func.count(Genre.genre_id)).filter(
+                    Genre.genre_id.in_(provided_genre_ids)
+                ).scalar()
+                if existing_count != len(provided_genre_ids):
+                    return jsonify({"error": "One or more genre IDs are invalid"}), 400
+                user.preferred_genre_ids = form.preferred_genre_ids.data
+            user.updated_at = datetime.now(timezone.utc)
             db.session.commit()
 
             if form.email.data and form.email.data != user.email:
@@ -492,7 +514,8 @@ def profile():
                     "name": user.name,
                     "email": user.email,
                     "role": user.role,
-                    "user_image": user.user_image
+                    "user_image": user.user_image,
+                    "preferred_genre_ids": [str(gid) for gid in user.preferred_genre_ids] if user.preferred_genre_ids else []
                 }
             }), 200
 
