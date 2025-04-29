@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Documentation - Library System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #fdfdfd;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        .endpoint {
+            background: #f4f8fb;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #3498db;
+        }
+        code {
+            background: #eee;
+            padding: 2px 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📚 Library API Documentation</h1>
+
+    <p>Welcome! Below are the available API endpoints grouped by module.</p>
+
+    {% for section in sections %}
+        <h2>{{ section.name }}</h2>
+        {% for ep in section.endpoints %}
+            <div class="endpoint">
+                <p><strong>{{ ep.method }} <code>{{ ep.path }}</code></strong></p>
+                <p>{{ ep.description }}</p>
+            </div>
+        {% endfor %}
+    {% endfor %}
+
+</body>
+</html>

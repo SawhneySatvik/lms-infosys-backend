@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from .config import Config
 
@@ -14,7 +14,7 @@ def create_app():
 
     @app.route('/')
     def index():
-        return {"message":"Hello!"}
+        return redirect(url_for('docs.index'))
 
     @app.route('/health')
     def health():
@@ -28,6 +28,7 @@ def create_app():
         except Exception as e:
             return {"error": str(e)}, 500
     
+    from .blueprints.docs import docs_bp
     from .blueprints.auth import auth_bp
     from .blueprints.books import books_bp
     from .blueprints.authors import authors_bp
@@ -36,6 +37,7 @@ def create_app():
     from .blueprints.librarians import librarians_bp
     from .blueprints.admin import admin_bp
 
+    app.register_blueprint(docs_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
     app.register_blueprint(authors_bp)
