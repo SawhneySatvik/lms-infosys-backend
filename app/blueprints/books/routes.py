@@ -37,16 +37,16 @@ def create_book():
         author_ids = form.author_ids.data or []
         genre_ids = form.genre_ids.data or []
         if author_ids and not all(Author.query.filter_by(author_id=aid).first() for aid in author_ids):
-            return jsonify({"error": "Invalid author_id"}), 400
+            return jsonify({"error": "One or more author_ids are invalid"}), 400
         if genre_ids and not all(Genre.query.filter_by(genre_id=gid).first() for gid in genre_ids):
-            return jsonify({"error": "Invalid genre_id"}), 400
+            return jsonify({"error": "One or more genre_ids are invalid"}), 400
 
-        # Upload book_image if provided
+        # Handle book_image upload
         book_image_url = None
         if 'book_image' in request.files:
             file = request.files['book_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"book_{datetime.utcnow().timestamp()}_{file.filename}"
                 supabase.storage.from_('book_images').upload(
                     path=filename,
                     file=file.stream,
@@ -59,7 +59,7 @@ def create_book():
         if form.published_date.data:
             published_date = datetime.strptime(form.published_date.data, '%Y-%m-%d')
 
-        # Create book
+        # Create book instance
         new_book = Book(
             library_id=librarian.library_id,
             title=form.title.data,
@@ -88,11 +88,7 @@ def create_book():
                 db.session.add(author)
 
         db.session.commit()
-
-        return jsonify({
-            "message": "Book created successfully",
-            "book_id": str(new_book.book_id)
-        }), 201
+        return jsonify({"message": "Book created successfully", "book_id": str(new_book.book_id)}), 201
 
     except Exception as e:
         db.session.rollback()
@@ -107,7 +103,7 @@ def list_books():
         per_page = request.args.get('per_page', 20, type=int)
         query = Book.query.filter_by(library_id=user.library_id)
 
-        # Optional filters
+        # Apply filters
         title = request.args.get('title')
         author_id = request.args.get('author_id')
         genre_id = request.args.get('genre_id')
@@ -130,8 +126,8 @@ def list_books():
                 "available_copies": book.available_copies,
                 "reserved_copies": book.reserved_copies,
                 "book_image": book.book_image,
-                "author_ids": [str(aid) for aid in book.author_ids or []],
-                "genre_ids": [str(gid) for gid in book.genre_ids or []],
+                "author_ids": [str(aid) for aid in (book.author_ids or [])],
+                "genre_ids": [str(gid) for gid in (book.genre_ids or [])],
                 "published_date": book.published_date.isoformat() if book.published_date else None,
                 "added_on": book.added_on.isoformat(),
                 "updated_at": book.updated_at.isoformat()
@@ -164,8 +160,8 @@ def get_book(book_id):
                 "available_copies": book.available_copies,
                 "reserved_copies": book.reserved_copies,
                 "book_image": book.book_image,
-                "author_ids": [str(aid) for aid in book.author_ids or []],
-                "genre_ids": [str(gid) for gid in book.genre_ids or []],
+                "author_ids": [str(aid) for aid in (book.author_ids or [])],
+                "genre_ids": [str(gid) for gid in (book.genre_ids or [])],
                 "published_date": book.published_date.isoformat() if book.published_date else None,
                 "added_on": book.added_on.isoformat(),
                 "updated_at": book.updated_at.isoformat()
@@ -189,19 +185,19 @@ def update_book(book_id):
             return jsonify({"error": "Book not found"}), 404
 
         # Validate author_ids and genre_ids
-        author_ids = form.author_ids.data or book.author_ids
-        genre_ids = form.genre_ids.data or book.genre_ids
+        author_ids = form.author_ids.data if form.author_ids.data is not None else book.author_ids
+        genre_ids = form.genre_ids.data if form.genre_ids.data is not None else book.genre_ids
         if author_ids and not all(Author.query.filter_by(author_id=aid).first() for aid in author_ids):
-            return jsonify({"error": "Invalid author_id"}), 400
+            return jsonify({"error": "One or more author_ids are invalid"}), 400
         if genre_ids and not all(Genre.query.filter_by(genre_id=gid).first() for gid in genre_ids):
-            return jsonify({"error": "Invalid genre_id"}), 400
+            return jsonify({"error": "One or more genre_ids are invalid"}), 400
 
-        # Upload new book_image if provided
+        # Handle book_image upload
         book_image_url = book.book_image
         if 'book_image' in request.files:
             file = request.files['book_image']
             if file and allowed_file(file.filename):
-                filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+                filename = f"book_{datetime.utcnow().timestamp()}_{file.filename}"
                 supabase.storage.from_('book_images').upload(
                     path=filename,
                     file=file.stream,
@@ -210,15 +206,11 @@ def update_book(book_id):
                 book_image_url = supabase.storage.from_('book_images').get_public_url(filename)
 
         # Update book fields
-        if form.title.data:
-            book.title = form.title.data
-        if form.isbn.data:
-            book.isbn = form.isbn.data
-        if form.description.data is not None:
-            book.description = form.description.data
-        if form.publisher_name.data is not None:
-            book.publisher_name = form.publisher_name.data
-        if form.total_copies.data:
+        book.title = form.title.data or book.title
+        book.isbn = form.isbn.data or book.isbn
+        book.description = form.description.data if form.description.data is not None else book.description
+        book.publisher_name = form.publisher_name.data if form.publisher_name.data is not None else book.publisher_name
+        if form.total_copies.data is not None:
             delta = form.total_copies.data - book.total_copies
             book.total_copies = form.total_copies.data
             book.available_copies += delta
@@ -246,11 +238,7 @@ def update_book(book_id):
                 db.session.add(author)
 
         db.session.commit()
-
-        return jsonify({
-            "message": "Book updated successfully",
-            "book_id": str(book.book_id)
-        }), 200
+        return jsonify({"message": "Book updated successfully", "book_id": str(book.book_id)}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -275,7 +263,6 @@ def delete_book(book_id):
 
         db.session.delete(book)
         db.session.commit()
-
         return jsonify({"message": "Book deleted successfully"}), 200
 
     except Exception as e:
