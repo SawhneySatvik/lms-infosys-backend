@@ -23,6 +23,7 @@ CREATE TABLE users (
     email TEXT NOT NULL UNIQUE,
     role TEXT CHECK (role IN ('Admin', 'Librarian', 'Member')) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    preferred_genre_ids UUID[] DEFAULT '{}',
     borrowed_book_ids UUID[] DEFAULT '{}',
     reserved_book_ids UUID[] DEFAULT '{}',
     wishlist_book_ids UUID[] DEFAULT '{}',
@@ -165,6 +166,8 @@ CREATE TABLE otp_verifications (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     otp TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
