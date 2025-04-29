@@ -15,7 +15,7 @@ def role_required(allowed_roles):
                 return jsonify({"error": "Missing or invalid Authorization header"}), 401
 
             token = auth_header.split(" ")[1]
-            print(f"Received token: {token[:10]}...")  # Debug: Print first 10 chars
+            print(f"Received token: {token[:10]}...") 
 
             try:
                 # Decode JWT with Supabase JWT secret
