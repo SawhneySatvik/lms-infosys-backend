@@ -32,10 +32,16 @@ def create_app():
     from .blueprints.books import books_bp
     from .blueprints.authors import authors_bp
     from .blueprints.genres import genres_bp
+    from .blueprints.members import members_bp
+    from .blueprints.librarians import librarians_bp
+    from .blueprints.admin import admin_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
     app.register_blueprint(authors_bp)
     app.register_blueprint(genres_bp)
+    app.register_blueprint(members_bp)
+    app.register_blueprint(librarians_bp)
+    app.register_blueprint(admin_bp)
 
     return app
