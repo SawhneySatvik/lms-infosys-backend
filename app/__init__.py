@@ -36,6 +36,11 @@ def create_app():
     from .blueprints.members import members_bp
     from .blueprints.librarians import librarians_bp
     from .blueprints.admin import admin_bp
+    # from .blueprints.borrowing import borrowing_bp
+    # from .blueprints.fines import fine_bp
+    # from .blueprints.reservations import reservation_bp
+    # from .blueprints.tickets import ticket_bp
+    from .blueprints.wishlist import wishlist_bp
 
     app.register_blueprint(docs_bp)
     app.register_blueprint(auth_bp)
@@ -45,5 +50,10 @@ def create_app():
     app.register_blueprint(members_bp)
     app.register_blueprint(librarians_bp)
     app.register_blueprint(admin_bp)
+    # app.register_blueprint(borrowing_bp)
+    # app.register_blueprint(fine_bp)
+    # app.register_blueprint(reservation_bp)
+    # app.register_blueprint(ticket_bp)
+    app.register_blueprint(wishlist_bp)
 
     return app
